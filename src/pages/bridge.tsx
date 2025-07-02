@@ -1,6 +1,7 @@
 import type { NextPage } from 'next';
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { etherTokens } from '../utils/etherTokens';
 import { useChainId, useSwitchChain, useChains, useAccount } from 'wagmi';
 import { config } from '../wagmi';
@@ -126,7 +127,7 @@ const EtherToPulse: NextPage = () => {
             bridgeAmount,
             feeRate: platformFee/1000
         };
-    }, [amount]);
+    }, [amount, platformFee]);
 
     const handleModalClose = () => {
         setShowTokenModal(false);
@@ -196,9 +197,11 @@ const EtherToPulse: NextPage = () => {
                                 className="w-full flex items-center justify-between p-4 bg-gray-800/50 border border-gray-600 rounded-xl hover:border-blue-500 transition-colors cursor-pointer"
                             >
                                 <div className="flex items-center space-x-3">
-                                    <img 
+                                    <Image 
                                         src={selectedToken.image} 
                                         alt={selectedToken.symbol} 
+                                        width={32}
+                                        height={32}
                                         className="w-8 h-8 rounded-full"
                                         onError={(e) => {
                                             e.currentTarget.src = 'https://via.placeholder.com/32x32/6b7280/ffffff?text=' + selectedToken.symbol.charAt(0);
@@ -344,9 +347,11 @@ const EtherToPulse: NextPage = () => {
                                     }}
                                     className="w-full flex items-center space-x-3 p-4 hover:bg-gray-800/50 transition-colors border-b border-gray-700/30 last:border-b-0 cursor-pointer"
                                 >
-                                    <img 
+                                    <Image 
                                         src={token.image} 
                                         alt={token.symbol} 
+                                        width={40}
+                                        height={40}
                                         className="w-10 h-10 rounded-full"
                                         onError={(e) => {
                                             e.currentTarget.src = 'https://via.placeholder.com/40x40/6b7280/ffffff?text=' + token.symbol.charAt(0);
