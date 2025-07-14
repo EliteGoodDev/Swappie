@@ -1,5 +1,5 @@
 import type { NextPage } from 'next';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useChainId, useSwitchChain, useChains, useAccount } from 'wagmi';
 import { swapTokenList } from '../utils/swap_tokenlist';
 import { getBalance, readContract, waitForTransactionReceipt } from '@wagmi/core';
@@ -39,6 +39,8 @@ const Swap: NextPage = () => {
     const [swapType, setSwapType] = useState<number>(0);
     const { modalState, showPending, showSuccess, showError, closeModal } = useTransactionModal();
     const [path, setPath] = useState<any>(null);
+
+    const isProgrammaticUpdate = useRef(false);
 
     // Find PulseChain in your supported chains
     const pulseChain = chains.find(chain => chain.id === 369);
@@ -607,6 +609,11 @@ const Swap: NextPage = () => {
     const debounceTimeout = 400; // ms
 
     useEffect(() => {
+        if (isProgrammaticUpdate.current) {
+            isProgrammaticUpdate.current = false;
+            return;
+        }
+
         // Don't call API for wrap/unwrap
         if (swapType === 0 || swapType === 1) {
             if (lastChanged === 'from') setToAmount(fromAmount ? fromAmount : '');
@@ -628,6 +635,7 @@ const Swap: NextPage = () => {
                     isAmountIn: true
                 }).then(res => {
                     setPath(res.data.path);
+                    isProgrammaticUpdate.current = true;
                     setToAmount(formatUnits(res.data.amount, toToken?.decimals ?? 0));
                 }).catch(err => {
                     console.log(err);
@@ -643,6 +651,7 @@ const Swap: NextPage = () => {
                     isAmountIn: false
                 }).then(res => {
                     setPath(res.data.path);
+                    isProgrammaticUpdate.current = true;
                     setFromAmount(formatUnits(res.data.amount, fromToken?.decimals ?? 0));
                 }).catch(err => {
                     console.log(err);
