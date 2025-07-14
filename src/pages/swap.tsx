@@ -3,14 +3,13 @@ import { useEffect, useState } from 'react';
 import { useChainId, useSwitchChain, useChains, useAccount } from 'wagmi';
 import { swapTokenList } from '../utils/swap_tokenlist';
 import { getBalance, readContract, waitForTransactionReceipt } from '@wagmi/core';
-import { formatUnits, parseUnits } from 'viem';
+import { formatUnits, maxUint256, parseUnits } from 'viem';
+import axios from 'axios';
 import { config } from '../wagmi';
-import { WPLS_ADDRESS, WPLS_ABI } from '../utils/contractData';
+import { WPLS_ADDRESS, WPLS_ABI, PulseX_Router_Address, PulseX_Router_ABI, Erc20_ABI } from '../utils/contractData';
 import { useWriteContract } from 'wagmi'
 import { useTransactionModal } from '../hooks/useTransactionModal';
 import { TransactionModal } from '../components/TransactionModal';
-import { useWaitForTransactionReceipt } from 'wagmi';
-
 
 interface Token {
     chainId: number;
@@ -36,11 +35,10 @@ const Swap: NextPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [lastChanged, setLastChanged] = useState<'from' | 'to'>('from');
     const [fromTokenBalance, setFromTokenBalance] = useState('');
-    const [fromTokenDecimals, setFromTokenDecimals] = useState(0);
     const [toTokenBalance, setToTokenBalance] = useState('');
-    const [toTokenDecimals, setToTokenDecimals] = useState(0);
     const [swapType, setSwapType] = useState<number>(0);
     const { modalState, showPending, showSuccess, showError, closeModal } = useTransactionModal();
+    const [path, setPath] = useState<any>(null);
 
     // Find PulseChain in your supported chains
     const pulseChain = chains.find(chain => chain.id === 369);
@@ -76,7 +74,6 @@ const Swap: NextPage = () => {
                         chainId: 369
                         });
                     setFromTokenBalance(balance.formatted);
-                    setFromTokenDecimals(balance.decimals);
                 }
                 else{
                     const balance = await getBalance(config, {
@@ -85,7 +82,6 @@ const Swap: NextPage = () => {
                         chainId: 369
                     });
                     setFromTokenBalance(balance.formatted);
-                    setFromTokenDecimals(balance.decimals);
                 }
                 if (toToken == null) return;
                 if (toToken.symbol == 'PLS') {
@@ -94,7 +90,6 @@ const Swap: NextPage = () => {
                         chainId: 369
                     });
                     setToTokenBalance(balance.formatted);
-                    setToTokenDecimals(balance.decimals);
                 }
                 else{
                     const balance = await getBalance(config, {
@@ -103,7 +98,6 @@ const Swap: NextPage = () => {
                         chainId: 369
                     });
                     setToTokenBalance(balance.formatted);
-                    setToTokenDecimals(balance.decimals);
                 }
             }
         };
@@ -238,27 +232,49 @@ const Swap: NextPage = () => {
     );
 
     const handleFromAmountChange = (value: string) => {
+        if (isNaN(Number(value)) || value == ''){
+            setToAmount('');
+        }
         setFromAmount(value);
         setLastChanged('from');
-        if (swapType == 0 || swapType == 1){
-            setToAmount(value ? (value) : '');
-        }
     };
 
     const handleToAmountChange = (value: string) => {
+        if (isNaN(Number(value)) || value == ''){
+            setFromAmount('');
+        }
         setToAmount(value);
         setLastChanged('to');
-        if (swapType == 0 || swapType == 1){
-            setFromAmount(value ? (value) : '');
-        }
     };
 
     const handleSwap = async () => {
         if (swapType == 0){
             await wrap();
         }
-        if (swapType == 1){
+        else if (swapType == 1){
             await unwrap();
+        }
+        else if (swapType == 2){
+            await swapExactETHForTokens();
+        }
+        else if (swapType == 3){
+            await swapETHForExactTokens();
+        }
+        else if (swapType == 4){
+            await approveTokens();
+            await swapExactTokensForETH();
+        }
+        else if (swapType == 5){
+            await approveTokens();
+            await swapTokensForExactETH();
+        }
+        else if (swapType == 6){
+            await approveTokens();
+            await swapExactTokensForTokens();
+        }
+        else if (swapType == 7){
+            await approveTokens();
+            await swapTokensForExactTokens();
         }
     }
 
@@ -272,7 +288,7 @@ const Swap: NextPage = () => {
                 abi: WPLS_ABI,
                 functionName: 'deposit',
                 chainId: 369,
-                value: parseUnits(fromAmount, fromTokenDecimals)
+                value: parseUnits(fromAmount, fromToken?.decimals ?? 0)
             });
             
             const receipt = await waitForTransactionReceipt(config, {
@@ -302,7 +318,7 @@ const Swap: NextPage = () => {
                 abi: WPLS_ABI,
                 functionName: 'withdraw',
                 chainId: 369,
-                args: [parseUnits(fromAmount, fromTokenDecimals)]
+                args: [parseUnits(fromAmount, fromToken?.decimals ?? 0)]
             });
             
             const receipt = await waitForTransactionReceipt(config, {
@@ -321,6 +337,331 @@ const Swap: NextPage = () => {
             setToAmount('');
         }
     }
+
+    const swapExactETHForTokens = async () => {
+        setIsLoading(true);
+        try {
+            showPending('Swapping PLS');
+
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const slippagePercent = slippage / 100;
+            const slippageFactor = BigInt(Math.floor((1 - slippagePercent) * 1000));
+            const amount = parseUnits(toAmount, toToken?.decimals ?? 0);
+            const amountOutMin = (amount * slippageFactor) / BigInt(1000);
+
+            const hash = await writeContractAsync({
+                address: PulseX_Router_Address,
+                abi: PulseX_Router_ABI,
+                functionName: 'swapExactETHForTokens',
+                chainId: 369,
+                value: parseUnits(fromAmount, 18),
+                args: [amountOutMin, path, address, deadline]
+            });
+
+            const receipt = await waitForTransactionReceipt(config, {
+                hash: hash,
+                chainId: 369
+            });
+            
+            if (receipt.status === 'success') {
+                showSuccess(hash, 'Swap successful!');
+            } 
+        } catch (error) {
+            showError('Transaction failed');
+        } finally {
+            setIsLoading(false);
+            setFromAmount('');
+            setToAmount('');
+        }
+    }
+
+    const swapETHForExactTokens = async () => {
+        setIsLoading(true);
+        try {
+            showPending('Swapping PLS');
+
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const hash = await writeContractAsync({
+                address: PulseX_Router_Address,
+                abi: PulseX_Router_ABI,
+                functionName: 'swapETHForExactTokens',
+                chainId: 369,
+                value: parseUnits(fromAmount, 18),
+                args: [parseUnits(toAmount, toToken?.decimals ?? 0), path, address, deadline]
+            });
+
+            const receipt = await waitForTransactionReceipt(config, {
+                hash: hash,
+                chainId: 369
+            });
+            
+            if (receipt.status === 'success') {
+                showSuccess(hash, 'Swap successful!');
+            } 
+        } catch (error) {
+            showError('Transaction failed');
+        } finally {
+            setIsLoading(false);
+            setFromAmount('');
+            setToAmount('');
+        }
+    }
+
+    const swapExactTokensForETH = async () => {
+        setIsLoading(true);
+        try {
+            showPending(`Swapping ${fromToken?.symbol} into PLS`);
+
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const slippagePercent = slippage / 100;
+            const slippageFactor = BigInt(Math.floor((1 - slippagePercent) * 1000));
+            const amount = parseUnits(toAmount, toToken?.decimals ?? 0);
+            const amountOutMin = (amount * slippageFactor) / BigInt(1000);
+
+            const hash = await writeContractAsync({
+                address: PulseX_Router_Address,
+                abi: PulseX_Router_ABI,
+                functionName: 'swapExactTokensForETH',
+                chainId: 369,
+                args: [parseUnits(fromAmount, fromToken?.decimals ?? 0), amountOutMin, path, address, deadline]
+            });
+
+            const receipt = await waitForTransactionReceipt(config, {
+                hash: hash,
+                chainId: 369
+            });
+            
+            if (receipt.status === 'success') {
+                showSuccess(hash, 'Swap successful!');
+            } 
+        } catch (error) {
+            showError('Transaction failed');
+        } finally {
+            setIsLoading(false);
+            setFromAmount('');
+            setToAmount('');
+        }
+    }
+
+    const swapTokensForExactETH = async () => {
+        setIsLoading(true);
+        try {
+            showPending(`Swapping ${fromToken?.symbol} into PLS`);
+
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const slippagePercent = slippage / 100;
+            const slippageFactor = BigInt(Math.floor((1 + slippagePercent) * 1000));
+            const amount = parseUnits(fromAmount, fromToken?.decimals ?? 0);
+            const amountInMax = (amount * slippageFactor) / BigInt(1000);
+
+            const hash = await writeContractAsync({
+                address: PulseX_Router_Address,
+                abi: PulseX_Router_ABI,
+                functionName: 'swapTokensForExactETH',
+                chainId: 369,
+                args: [parseUnits(toAmount, toToken?.decimals ?? 0), amountInMax, path, address, deadline]
+            });
+
+            const receipt = await waitForTransactionReceipt(config, {
+                hash: hash,
+                chainId: 369
+            });
+            
+            if (receipt.status === 'success') {
+                showSuccess(hash, 'Swap successful!');
+            } 
+        } catch (error) {
+            showError('Transaction failed');
+        } finally {
+            setIsLoading(false);
+            setFromAmount('');
+            setToAmount('');
+        }
+    }
+
+    const swapExactTokensForTokens = async () => {
+        setIsLoading(true);
+        try {
+            showPending(`Swapping ${fromToken?.symbol} into ${toToken?.symbol}`);
+
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const slippagePercent = slippage / 100;
+            const slippageFactor = BigInt(Math.floor((1 - slippagePercent) * 1000));
+            const amount = parseUnits(toAmount, toToken?.decimals ?? 0);
+            const amountOutMin = (amount * slippageFactor) / BigInt(1000);
+
+            const hash = await writeContractAsync({
+                address: PulseX_Router_Address,
+                abi: PulseX_Router_ABI,
+                functionName: 'swapExactTokensForTokens',
+                chainId: 369,
+                args: [parseUnits(fromAmount, fromToken?.decimals ?? 0), amountOutMin, path, address, deadline]
+            });
+
+            const receipt = await waitForTransactionReceipt(config, {
+                hash: hash,
+                chainId: 369
+            });
+            
+            if (receipt.status === 'success') {
+                showSuccess(hash, 'Swap successful!');
+            } 
+        } catch (error) {
+            showError('Transaction failed');
+        } finally {
+            setIsLoading(false);
+            setFromAmount('');
+            setToAmount('');
+        }
+    }
+
+    const swapTokensForExactTokens = async () => {
+        setIsLoading(true);
+        try {
+            showPending(`Swapping ${fromToken?.symbol} into ${toToken?.symbol}`);
+
+            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const slippagePercent = slippage / 100;
+            const slippageFactor = BigInt(Math.floor((1 + slippagePercent) * 1000));
+            const amount = parseUnits(fromAmount, fromToken?.decimals ?? 0);
+            const amountInMax = (amount * slippageFactor) / BigInt(1000);
+
+            const hash = await writeContractAsync({
+                address: PulseX_Router_Address,
+                abi: PulseX_Router_ABI,
+                functionName: 'swapTokensForExactTokens',
+                chainId: 369,
+                args: [parseUnits(toAmount, toToken?.decimals ?? 0), amountInMax, path, address, deadline]
+            });
+
+            const receipt = await waitForTransactionReceipt(config, {
+                hash: hash,
+                chainId: 369
+            });
+            
+            if (receipt.status === 'success') {
+                showSuccess(hash, 'Swap successful!');
+            } 
+        } catch (error) {
+            showError('Transaction failed');
+        } finally {
+            setIsLoading(false);
+            setFromAmount('');
+            setToAmount('');
+        }
+    }
+
+    const approveTokens = async () => {
+        if (!fromToken || !address) return;
+
+        // 1. Read current allowance
+        const allowance = await readContract(config, {
+            address: fromToken.address as `0x${string}`,
+            abi: Erc20_ABI,
+            functionName: 'allowance',
+            args: [
+                address,                // owner (user's address)
+                PulseX_Router_Address   // spender (router)
+            ],
+            chainId: 369
+        });
+
+        const amountToApprove = parseUnits(fromAmount, fromToken.decimals);
+
+        // 2. If allowance is enough, skip approve
+        if (BigInt(allowance as string) >= amountToApprove) {
+            return;
+        }
+
+        try {
+            showPending('Approve token spending');
+
+            // 3. Approve
+            const txHash = await writeContractAsync({
+                address: fromToken.address as `0x${string}`,
+                abi: Erc20_ABI,
+                functionName: 'approve',
+                args: [
+                    PulseX_Router_Address,
+                    maxUint256
+                ],
+                chainId: 369
+            });
+
+            const receipt = await waitForTransactionReceipt(config, {
+                hash: txHash,
+                chainId: 369
+            });
+
+            if (receipt.status === 'success') {
+                showSuccess(txHash, 'Approval successful!');
+            } else {
+                showError('Approval failed');
+            }
+        } catch (error) {
+            showError('Approval transaction failed');
+            console.error(error);
+        }
+    };
+
+    const debounceTimeout = 400; // ms
+
+    useEffect(() => {
+        // Don't call API for wrap/unwrap
+        if (swapType === 0 || swapType === 1) {
+            if (lastChanged === 'from') setToAmount(fromAmount ? fromAmount : '');
+            if (lastChanged === 'to') setFromAmount(toAmount ? toAmount : '');
+            return;
+        }
+
+        // Debounce logic
+        const handler = setTimeout(() => {
+            let fromTokenAddress = fromToken?.address === '0x0000000000000000000000000000000000000000' ? WPLS_ADDRESS : fromToken?.address;
+            let toTokenAddress = toToken?.address === '0x0000000000000000000000000000000000000000' ? WPLS_ADDRESS : toToken?.address;
+
+            if (lastChanged === 'from' && fromAmount && !isNaN(Number(fromAmount)) && fromToken?.decimals) {
+                setIsLoading(true);
+                axios.post('http://localhost:3001/api/trading/find-path', {
+                    fromToken: fromTokenAddress,
+                    toToken: toTokenAddress,
+                    amount: parseUnits(fromAmount, fromToken?.decimals).toString(),
+                    isAmountIn: true
+                }).then(res => {
+                    setPath(res.data.path);
+                    setToAmount(formatUnits(res.data.amount, toToken?.decimals ?? 0));
+                }).catch(err => {
+                    console.log(err);
+                }).finally(() => {
+                    setIsLoading(false);
+                });
+            } else if (lastChanged === 'to' && toAmount && !isNaN(Number(toAmount)) && toToken?.decimals) {
+                setIsLoading(true);
+                axios.post('http://localhost:3001/api/trading/find-path', {
+                    fromToken: fromTokenAddress,
+                    toToken: toTokenAddress,
+                    amount: parseUnits(toAmount, toToken?.decimals).toString(),
+                    isAmountIn: false
+                }).then(res => {
+                    setPath(res.data.path);
+                    setFromAmount(formatUnits(res.data.amount, fromToken?.decimals ?? 0));
+                }).catch(err => {
+                    console.log(err);
+                }).finally(() => {
+                    setIsLoading(false);
+                });
+            }
+        }, debounceTimeout);
+
+        return () => clearTimeout(handler);
+    }, [
+        lastChanged,
+        fromAmount,
+        toAmount,
+        fromToken,
+        toToken,
+        swapType
+    ]);
+
 
     return (
         <div className="container mx-auto px-4 py-20">
@@ -352,6 +693,7 @@ const Swap: NextPage = () => {
                                         onChange={e => {
                                             handleFromAmountChange(e.target.value);
                                         }}
+                                        disabled = {isLoading}
                                         placeholder="0.0"
                                         className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white outline-none appearance-textfield
                                             [&::-webkit-outer-spin-button]:appearance-none
@@ -421,6 +763,7 @@ const Swap: NextPage = () => {
                                     onChange={e => {
                                         handleToAmountChange(e.target.value);
                                     }}
+                                    disabled = {isLoading}
                                     placeholder="0.0"
                                     className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white outline-none appearance-textfield
                                         [&::-webkit-outer-spin-button]:appearance-none
@@ -453,7 +796,7 @@ const Swap: NextPage = () => {
                             {isLoading ? (
                                 <div className="flex items-center justify-center">
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                                    Swapping...
+                                    Loading...
                                 </div>
                             ) : !isConnected ? (
                                 'Connect Wallet'
