@@ -39,6 +39,12 @@ const Swap: NextPage = () => {
     const [swapType, setSwapType] = useState<number>(0);
     const { modalState, showPending, showSuccess, showError, closeModal } = useTransactionModal();
     const [path, setPath] = useState<any>(null);
+    const [customTokenAddress, setCustomTokenAddress] = useState('');
+    const [customTokens, setCustomTokens] = useState<Token[]>([]);
+    const [isLoadingCustomToken, setIsLoadingCustomToken] = useState(false);
+    const [customTokenError, setCustomTokenError] = useState('');
+    const [previewToken, setPreviewToken] = useState<Token | null>(null);
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
     const isProgrammaticUpdate = useRef(false);
 
@@ -140,7 +146,165 @@ const Swap: NextPage = () => {
         }
     }, [fromToken, toToken, lastChanged, isLoading]);
 
-    const filteredTokens = swapTokenList.filter(token => {
+    // Function to validate Ethereum address
+    const isValidAddress = (address: string): boolean => {
+        return /^0x[a-fA-F0-9]{40}$/.test(address);
+    };
+
+    // Function to fetch token information from blockchain
+    const fetchTokenInfo = async (tokenAddress: string): Promise<Token | null> => {
+        try {
+            const [name, symbol, decimals] = await Promise.all([
+                readContract(config, {
+                    address: tokenAddress as `0x${string}`,
+                    abi: Erc20_ABI,
+                    functionName: 'name',
+                    chainId: 369
+                }),
+                readContract(config, {
+                    address: tokenAddress as `0x${string}`,
+                    abi: Erc20_ABI,
+                    functionName: 'symbol',
+                    chainId: 369
+                }),
+                readContract(config, {
+                    address: tokenAddress as `0x${string}`,
+                    abi: Erc20_ABI,
+                    functionName: 'decimals',
+                    chainId: 369
+                })
+            ]);
+
+            return {
+                chainId: 369,
+                name: name as string,
+                address: tokenAddress,
+                symbol: symbol as string,
+                decimals: decimals as number,
+                logoURI: `https://dummyimage.com/64x64/cccccc/000000&text=${(symbol as string).slice(0, 2)}`
+            };
+        } catch (error) {
+            console.error('Error fetching token info:', error);
+            return null;
+        }
+    };
+
+    // Function to preview token information
+    const previewTokenInfo = async (tokenAddress: string) => {
+        if (!tokenAddress.trim() || !isValidAddress(tokenAddress)) {
+            setPreviewToken(null);
+            return;
+        }
+
+        // Check if token already exists
+        const allTokens = [...swapTokenList, ...customTokens];
+        const existingToken = allTokens.find(token => 
+            token.address.toLowerCase() === tokenAddress.toLowerCase()
+        );
+
+        if (existingToken) {
+            setPreviewToken(existingToken);
+            return;
+        }
+
+        setIsPreviewLoading(true);
+        setCustomTokenError('');
+
+        try {
+            const tokenInfo = await fetchTokenInfo(tokenAddress);
+            if (tokenInfo) {
+                setPreviewToken(tokenInfo);
+            } else {
+                setPreviewToken(null);
+                setCustomTokenError('Failed to fetch token information');
+            }
+        } catch (error) {
+            setPreviewToken(null);
+            setCustomTokenError('Error fetching token information');
+        } finally {
+            setIsPreviewLoading(false);
+        }
+    };
+
+    // Function to add custom token
+    const addCustomToken = async () => {
+        if (!customTokenAddress.trim()) {
+            setCustomTokenError('Please enter a token address');
+            return;
+        }
+
+        if (!isValidAddress(customTokenAddress)) {
+            setCustomTokenError('Invalid token address format');
+            return;
+        }
+
+        // Check if token already exists in the list
+        const allTokens = [...swapTokenList, ...customTokens];
+        const existingToken = allTokens.find(token => 
+            token.address.toLowerCase() === customTokenAddress.toLowerCase()
+        );
+
+        if (existingToken) {
+            // If token already exists, just select it
+            if (showTokenSelector === 'from') {
+                setFromToken(existingToken);
+                if (toToken?.address === existingToken.address) {
+                    setToToken(fromToken);
+                }
+            } else {
+                setToToken(existingToken);
+                if (fromToken?.address === existingToken.address) {
+                    setFromToken(toToken);
+                }
+            }
+            setShowTokenSelector(null);
+            setCustomTokenAddress('');
+            setPreviewToken(null);
+            setCustomTokenError('');
+            return;
+        }
+
+        setIsLoadingCustomToken(true);
+        setCustomTokenError('');
+
+        try {
+            const tokenInfo = await fetchTokenInfo(customTokenAddress);
+            
+            if (tokenInfo) {
+                // Add to custom tokens
+                setCustomTokens(prev => [...prev, tokenInfo]);
+                
+                // Automatically select the token
+                if (showTokenSelector === 'from') {
+                    setFromToken(tokenInfo);
+                    if (toToken?.address === tokenInfo.address) {
+                        setToToken(fromToken);
+                    }
+                } else {
+                    setToToken(tokenInfo);
+                    if (fromToken?.address === tokenInfo.address) {
+                        setFromToken(toToken);
+                    }
+                }
+                
+                setShowTokenSelector(null);
+                setCustomTokenAddress('');
+                setPreviewToken(null);
+                setCustomTokenError('');
+            } else {
+                setCustomTokenError('Failed to fetch token information. Please check the address.');
+            }
+        } catch (error) {
+            setCustomTokenError('Error fetching token information');
+        } finally {
+            setIsLoadingCustomToken(false);
+        }
+    };
+
+    // Combine default tokens with custom tokens
+    const allAvailableTokens = [...swapTokenList, ...customTokens];
+
+    const filteredTokens = allAvailableTokens.filter(token => {
         const searchLower = searchTerm.toLowerCase();
         return (
             token.name.toLowerCase().includes(searchLower) ||
@@ -155,7 +319,12 @@ const Swap: NextPage = () => {
                 <div className="flex justify-between items-center mb-4 flex-shrink-0">
                     <h3 className="text-xl font-semibold text-white">Select Token</h3>
                     <button
-                        onClick={() => setShowTokenSelector(null)}
+                        onClick={() => {
+                            setShowTokenSelector(null);
+                            setCustomTokenAddress('');
+                            setPreviewToken(null);
+                            setCustomTokenError('');
+                        }}
                         className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-slate-700 transition-colors cursor-pointer"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,6 +332,77 @@ const Swap: NextPage = () => {
                         </svg>
                     </button>
                 </div>
+
+                {/* Custom Token Input */}
+                <div className="flex-shrink-0 mb-4">
+                    <div className="flex gap-2 mb-2">
+                        <input
+                            type="text"
+                            placeholder="Enter custom token address..."
+                            value={customTokenAddress}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setCustomTokenAddress(value);
+                                setCustomTokenError('');
+                                // Preview token info when user types
+                                if (value.trim()) {
+                                    previewTokenInfo(value);
+                                } else {
+                                    setPreviewToken(null);
+                                }
+                            }}
+                            className="flex-1 p-3 bg-slate-700 rounded-lg text-white placeholder-gray-400 border border-slate-600 focus:border-blue-500 focus:outline-none transition-colors"
+                        />
+                        <button
+                            onClick={addCustomToken}
+                            disabled={isLoadingCustomToken || !customTokenAddress.trim() || !previewToken}
+                            className={`px-4 py-3 rounded-lg font-medium transition-colors ${
+                                isLoadingCustomToken || !customTokenAddress.trim() || !previewToken
+                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
+                        >
+                            {isLoadingCustomToken ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                                'Add'
+                            )}
+                        </button>
+                    </div>
+                    
+                    {/* Token Preview */}
+                    {isPreviewLoading && (
+                        <div className="flex items-center gap-2 p-3 bg-slate-700 rounded-lg mb-2">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                            <span className="text-gray-300">Loading token info...</span>
+                        </div>
+                    )}
+                    
+                    {previewToken && !isPreviewLoading && (
+                        <div className="flex items-center gap-3 p-3 bg-slate-700 rounded-lg mb-2 border border-green-500">
+                            <img
+                                src={previewToken.logoURI}
+                                alt={previewToken.symbol}
+                                className="w-8 h-8 rounded-full flex-shrink-0"
+                                onError={(e) => {
+                                    e.currentTarget.src = 'https://dummyimage.com/64x64/cccccc/000000&text=?';
+                                }}
+                            />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-white font-medium truncate">{previewToken.symbol}</div>
+                                <div className="text-gray-400 text-sm truncate">{previewToken.name}</div>
+                                <div className="text-gray-500 text-xs truncate">{previewToken.address}</div>
+                            </div>
+                            <div className="text-green-400 text-sm font-medium">Ready to add</div>
+                        </div>
+                    )}
+                    
+                    {customTokenError && (
+                        <div className="text-red-400 text-sm mb-2">{customTokenError}</div>
+                    )}
+                </div>
+
+                {/* Search Input */}
                 <div className="flex-shrink-0 mb-4">
                     <input
                         type="text"
@@ -173,6 +413,8 @@ const Swap: NextPage = () => {
                         autoFocus
                     />
                 </div>
+
+                {/* Token List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
                     {filteredTokens.length === 0 ? (
                         <div className="text-center py-12 text-gray-400">
@@ -202,6 +444,9 @@ const Swap: NextPage = () => {
                                         }
                                         setShowTokenSelector(null);
                                         setSearchTerm('');
+                                        setCustomTokenAddress('');
+                                        setPreviewToken(null);
+                                        setCustomTokenError('');
                                     }}
                                     className="flex items-center p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-slate-600"
                                 >
@@ -210,12 +455,13 @@ const Swap: NextPage = () => {
                                         alt={token.symbol}
                                         className="w-8 h-8 rounded-full mr-3 flex-shrink-0"
                                         onError={(e) => {
-                                            e.currentTarget.src = 'https://via.placeholder.com/32/6366f1/ffffff?text=?';
+                                            e.currentTarget.src = 'https://dummyimage.com/64x64/cccccc/000000&text=?';
                                         }}
                                     />
                                     <div className="flex-1 min-w-0">
                                         <div className="text-white font-medium truncate">{token.symbol}</div>
                                         <div className="text-gray-400 text-sm truncate">{token.name}</div>
+                                        <div className="text-gray-500 text-xs truncate">{token.address}</div>
                                     </div>
                                     {(fromToken?.address === token.address || toToken?.address === token.address) && (
                                         <div className="ml-2 text-blue-500 flex-shrink-0">
