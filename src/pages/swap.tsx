@@ -1,15 +1,16 @@
 import type { NextPage } from 'next';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useChainId, useSwitchChain, useChains, useAccount } from 'wagmi';
 import { swapTokenList } from '../utils/swap_tokenlist';
 import { getBalance, readContract, waitForTransactionReceipt } from '@wagmi/core';
 import { formatUnits, maxUint256, parseUnits } from 'viem';
 import axios from 'axios';
 import { config } from '../wagmi';
-import { WPLS_ADDRESS, WPLS_ABI, PulseX_Router_Address, PulseX_Router_ABI, Erc20_ABI } from '../utils/contractData';
+import { WPLS_ADDRESS, PLS_ADDRESS, WPLS_ABI, PulseX_Router_Address, PulseX_Router_ABI, Erc20_ABI } from '../utils/contractData';
 import { useWriteContract } from 'wagmi'
 import { useTransactionModal } from '../hooks/useTransactionModal';
 import { TransactionModal } from '../components/TransactionModal';
+import { backendUrl } from '../utils/config';
 
 interface Token {
     chainId: number;
@@ -29,11 +30,10 @@ const Swap: NextPage = () => {
     const [toToken, setToToken] = useState<Token | null>(null);
     const [fromAmount, setFromAmount] = useState('');
     const [toAmount, setToAmount] = useState('');
-    const [slippage, setSlippage] = useState(0.5);
+    const [slippage, setSlippage] = useState(5);
     const [showTokenSelector, setShowTokenSelector] = useState<'from' | 'to' | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [lastChanged, setLastChanged] = useState<'from' | 'to'>('from');
     const [fromTokenBalance, setFromTokenBalance] = useState('');
     const [toTokenBalance, setToTokenBalance] = useState('');
     const [swapType, setSwapType] = useState<number>(0);
@@ -46,9 +46,6 @@ const Swap: NextPage = () => {
     const [previewToken, setPreviewToken] = useState<Token | null>(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
-    const isProgrammaticUpdate = useRef(false);
-
-    // Find PulseChain in your supported chains
     const pulseChain = chains.find(chain => chain.id === 369);
 
     const { writeContractAsync } = useWriteContract();
@@ -58,17 +55,15 @@ const Swap: NextPage = () => {
             alert('Please connect your wallet to continue');
             return;
         }
-        // If not on PulseChain, prompt to switch
         if (chainId !== 369 && pulseChain && switchChain) {
             switchChain({ chainId: 369 });
         }
     }, [chainId, pulseChain, switchChain, isConnected]);
 
-    // Set default tokens on component mount
     useEffect(() => {
         if (swapTokenList.length > 0) {
             setFromToken(swapTokenList[0]); // PLS
-            setToToken(swapTokenList[4]); // PLSX
+            setToToken(swapTokenList[7]); // USDC
         }
     }, []);
 
@@ -76,7 +71,7 @@ const Swap: NextPage = () => {
         const fetchBalance = async () => {
             if (address) {
                 if (fromToken == null) return;
-                if (fromToken.symbol == 'PLS') {
+                if (fromToken.address == PLS_ADDRESS) {
                     const balance = await getBalance(config, {
                         address: address as `0x${string}`,
                         chainId: 369
@@ -92,7 +87,7 @@ const Swap: NextPage = () => {
                     setFromTokenBalance(balance.formatted);
                 }
                 if (toToken == null) return;
-                if (toToken.symbol == 'PLS') {
+                if (toToken.address == PLS_ADDRESS) {
                     const balance = await getBalance(config, {
                         address: address as `0x${string}`,
                         chainId: 369
@@ -113,45 +108,32 @@ const Swap: NextPage = () => {
     }, [fromToken, toToken, address, fromAmount, toAmount]);
 
     useEffect(() => {
-        if (fromToken?.address == '0x0000000000000000000000000000000000000000' && toToken?.address == '0xA1077a294dDE1B09bB078844df40758a5D0f9a27'){
+        if (fromToken?.address == PLS_ADDRESS && toToken?.address == WPLS_ADDRESS){
             setSwapType(0); // Wrap
             return;
         }
-        if (fromToken?.address == '0xA1077a294dDE1B09bB078844df40758a5D0f9a27' && toToken?.address == '0x0000000000000000000000000000000000000000'){
+        if (fromToken?.address == WPLS_ADDRESS && toToken?.address == PLS_ADDRESS){
             setSwapType(1); // Unwrap
             return;
         }
-        if (fromToken?.address == '0x0000000000000000000000000000000000000000' && lastChanged == 'from'){
+        if (fromToken?.address == PLS_ADDRESS){
             setSwapType(2); // swapExactETHForTokens
             return;
         }
-        if (fromToken?.address == '0x0000000000000000000000000000000000000000' && lastChanged == 'to'){
-            setSwapType(3); // swapETHForExactTokens
+        if (toToken?.address == PLS_ADDRESS){
+            setSwapType(3); // swapExactTokensForETH
             return;
         }
-        if (toToken?.address == '0x0000000000000000000000000000000000000000' && lastChanged == 'from'){
-            setSwapType(4); // swapExactTokensForETH
+        else{
+            setSwapType(4); // swapExactTokensForTokens
             return;
         }
-        if (toToken?.address == '0x0000000000000000000000000000000000000000' && lastChanged == 'to'){
-            setSwapType(5); // swapTokensForExactETH
-            return;
-        }
-        if (lastChanged == 'from'){
-            setSwapType(6); // swapExactTokensForTokens
-            return;
-        }
-        if (lastChanged == 'to'){
-            setSwapType(7); // swapTokensForExactTokens
-        }
-    }, [fromToken, toToken, lastChanged, isLoading]);
+    }, [fromToken, toToken, isLoading]);
 
-    // Function to validate Ethereum address
     const isValidAddress = (address: string): boolean => {
         return /^0x[a-fA-F0-9]{40}$/.test(address);
     };
 
-    // Function to fetch token information from blockchain
     const fetchTokenInfo = async (tokenAddress: string): Promise<Token | null> => {
         try {
             const [name, symbol, decimals] = await Promise.all([
@@ -189,14 +171,12 @@ const Swap: NextPage = () => {
         }
     };
 
-    // Function to preview token information
     const previewTokenInfo = async (tokenAddress: string) => {
         if (!tokenAddress.trim() || !isValidAddress(tokenAddress)) {
             setPreviewToken(null);
             return;
         }
 
-        // Check if token already exists
         const allTokens = [...swapTokenList, ...customTokens];
         const existingToken = allTokens.find(token => 
             token.address.toLowerCase() === tokenAddress.toLowerCase()
@@ -226,7 +206,6 @@ const Swap: NextPage = () => {
         }
     };
 
-    // Function to add custom token
     const addCustomToken = async () => {
         if (!customTokenAddress.trim()) {
             setCustomTokenError('Please enter a token address');
@@ -238,14 +217,12 @@ const Swap: NextPage = () => {
             return;
         }
 
-        // Check if token already exists in the list
         const allTokens = [...swapTokenList, ...customTokens];
         const existingToken = allTokens.find(token => 
             token.address.toLowerCase() === customTokenAddress.toLowerCase()
         );
 
         if (existingToken) {
-            // If token already exists, just select it
             if (showTokenSelector === 'from') {
                 setFromToken(existingToken);
                 if (toToken?.address === existingToken.address) {
@@ -271,10 +248,8 @@ const Swap: NextPage = () => {
             const tokenInfo = await fetchTokenInfo(customTokenAddress);
             
             if (tokenInfo) {
-                // Add to custom tokens
                 setCustomTokens(prev => [...prev, tokenInfo]);
                 
-                // Automatically select the token
                 if (showTokenSelector === 'from') {
                     setFromToken(tokenInfo);
                     if (toToken?.address === tokenInfo.address) {
@@ -301,7 +276,6 @@ const Swap: NextPage = () => {
         }
     };
 
-    // Combine default tokens with custom tokens
     const allAvailableTokens = [...swapTokenList, ...customTokens];
 
     const filteredTokens = allAvailableTokens.filter(token => {
@@ -333,7 +307,6 @@ const Swap: NextPage = () => {
                     </button>
                 </div>
 
-                {/* Custom Token Input */}
                 <div className="flex-shrink-0 mb-4">
                     <div className="flex gap-2 mb-2">
                         <input
@@ -344,7 +317,6 @@ const Swap: NextPage = () => {
                                 const value = e.target.value;
                                 setCustomTokenAddress(value);
                                 setCustomTokenError('');
-                                // Preview token info when user types
                                 if (value.trim()) {
                                     previewTokenInfo(value);
                                 } else {
@@ -370,7 +342,6 @@ const Swap: NextPage = () => {
                         </button>
                     </div>
                     
-                    {/* Token Preview */}
                     {isPreviewLoading && (
                         <div className="flex items-center gap-2 p-3 bg-slate-700 rounded-lg mb-2">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
@@ -402,7 +373,6 @@ const Swap: NextPage = () => {
                     )}
                 </div>
 
-                {/* Search Input */}
                 <div className="flex-shrink-0 mb-4">
                     <input
                         type="text"
@@ -414,7 +384,6 @@ const Swap: NextPage = () => {
                     />
                 </div>
 
-                {/* Token List */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
                     {filteredTokens.length === 0 ? (
                         <div className="text-center py-12 text-gray-400">
@@ -484,15 +453,6 @@ const Swap: NextPage = () => {
             setToAmount('');
         }
         setFromAmount(value);
-        setLastChanged('from');
-    };
-
-    const handleToAmountChange = (value: string) => {
-        if (isNaN(Number(value)) || value == ''){
-            setFromAmount('');
-        }
-        setToAmount(value);
-        setLastChanged('to');
     };
 
     const handleSwap = async () => {
@@ -506,23 +466,12 @@ const Swap: NextPage = () => {
             await swapExactETHForTokens();
         }
         else if (swapType == 3){
-            await swapETHForExactTokens();
-        }
-        else if (swapType == 4){
             await approveTokens();
             await swapExactTokensForETH();
         }
-        else if (swapType == 5){
-            await approveTokens();
-            await swapTokensForExactETH();
-        }
-        else if (swapType == 6){
+        else if (swapType == 4){
             await approveTokens();
             await swapExactTokensForTokens();
-        }
-        else if (swapType == 7){
-            await approveTokens();
-            await swapTokensForExactTokens();
         }
     }
 
@@ -589,7 +538,7 @@ const Swap: NextPage = () => {
     const swapExactETHForTokens = async () => {
         setIsLoading(true);
         try {
-            showPending('Swapping PLS');
+            showPending(`Swapping PLS into ${toToken?.symbol}`);
 
             const deadline = Math.floor(Date.now() / 1000) + 3600;
             const slippagePercent = slippage / 100;
@@ -597,45 +546,15 @@ const Swap: NextPage = () => {
             const amount = parseUnits(toAmount, toToken?.decimals ?? 0);
             const amountOutMin = (amount * slippageFactor) / BigInt(1000);
 
+            console.log(amountOutMin);
+
             const hash = await writeContractAsync({
                 address: PulseX_Router_Address,
                 abi: PulseX_Router_ABI,
-                functionName: 'swapExactETHForTokens',
+                functionName: 'swapExactETHForTokensSupportingFeeOnTransferTokens',
                 chainId: 369,
                 value: parseUnits(fromAmount, 18),
                 args: [amountOutMin, path, address, deadline]
-            });
-
-            const receipt = await waitForTransactionReceipt(config, {
-                hash: hash,
-                chainId: 369
-            });
-            
-            if (receipt.status === 'success') {
-                showSuccess(hash, 'Swap successful!');
-            } 
-        } catch (error) {
-            showError('Transaction failed');
-        } finally {
-            setIsLoading(false);
-            setFromAmount('');
-            setToAmount('');
-        }
-    }
-
-    const swapETHForExactTokens = async () => {
-        setIsLoading(true);
-        try {
-            showPending('Swapping PLS');
-
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
-            const hash = await writeContractAsync({
-                address: PulseX_Router_Address,
-                abi: PulseX_Router_ABI,
-                functionName: 'swapETHForExactTokens',
-                chainId: 369,
-                value: parseUnits(fromAmount, 18),
-                args: [parseUnits(toAmount, toToken?.decimals ?? 0), path, address, deadline]
             });
 
             const receipt = await waitForTransactionReceipt(config, {
@@ -669,45 +588,9 @@ const Swap: NextPage = () => {
             const hash = await writeContractAsync({
                 address: PulseX_Router_Address,
                 abi: PulseX_Router_ABI,
-                functionName: 'swapExactTokensForETH',
+                functionName: 'swapExactTokensForETHSupportingFeeOnTransferTokens',
                 chainId: 369,
                 args: [parseUnits(fromAmount, fromToken?.decimals ?? 0), amountOutMin, path, address, deadline]
-            });
-
-            const receipt = await waitForTransactionReceipt(config, {
-                hash: hash,
-                chainId: 369
-            });
-            
-            if (receipt.status === 'success') {
-                showSuccess(hash, 'Swap successful!');
-            } 
-        } catch (error) {
-            showError('Transaction failed');
-        } finally {
-            setIsLoading(false);
-            setFromAmount('');
-            setToAmount('');
-        }
-    }
-
-    const swapTokensForExactETH = async () => {
-        setIsLoading(true);
-        try {
-            showPending(`Swapping ${fromToken?.symbol} into PLS`);
-
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
-            const slippagePercent = slippage / 100;
-            const slippageFactor = BigInt(Math.floor((1 + slippagePercent) * 1000));
-            const amount = parseUnits(fromAmount, fromToken?.decimals ?? 0);
-            const amountInMax = (amount * slippageFactor) / BigInt(1000);
-
-            const hash = await writeContractAsync({
-                address: PulseX_Router_Address,
-                abi: PulseX_Router_ABI,
-                functionName: 'swapTokensForExactETH',
-                chainId: 369,
-                args: [parseUnits(toAmount, toToken?.decimals ?? 0), amountInMax, path, address, deadline]
             });
 
             const receipt = await waitForTransactionReceipt(config, {
@@ -741,45 +624,9 @@ const Swap: NextPage = () => {
             const hash = await writeContractAsync({
                 address: PulseX_Router_Address,
                 abi: PulseX_Router_ABI,
-                functionName: 'swapExactTokensForTokens',
+                functionName: 'swapExactTokensForTokensSupportingFeeOnTransferTokens',
                 chainId: 369,
                 args: [parseUnits(fromAmount, fromToken?.decimals ?? 0), amountOutMin, path, address, deadline]
-            });
-
-            const receipt = await waitForTransactionReceipt(config, {
-                hash: hash,
-                chainId: 369
-            });
-            
-            if (receipt.status === 'success') {
-                showSuccess(hash, 'Swap successful!');
-            } 
-        } catch (error) {
-            showError('Transaction failed');
-        } finally {
-            setIsLoading(false);
-            setFromAmount('');
-            setToAmount('');
-        }
-    }
-
-    const swapTokensForExactTokens = async () => {
-        setIsLoading(true);
-        try {
-            showPending(`Swapping ${fromToken?.symbol} into ${toToken?.symbol}`);
-
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
-            const slippagePercent = slippage / 100;
-            const slippageFactor = BigInt(Math.floor((1 + slippagePercent) * 1000));
-            const amount = parseUnits(fromAmount, fromToken?.decimals ?? 0);
-            const amountInMax = (amount * slippageFactor) / BigInt(1000);
-
-            const hash = await writeContractAsync({
-                address: PulseX_Router_Address,
-                abi: PulseX_Router_ABI,
-                functionName: 'swapTokensForExactTokens',
-                chainId: 369,
-                args: [parseUnits(toAmount, toToken?.decimals ?? 0), amountInMax, path, address, deadline]
             });
 
             const receipt = await waitForTransactionReceipt(config, {
@@ -802,7 +649,6 @@ const Swap: NextPage = () => {
     const approveTokens = async () => {
         if (!fromToken || !address) return;
 
-        // 1. Read current allowance
         const allowance = await readContract(config, {
             address: fromToken.address as `0x${string}`,
             abi: Erc20_ABI,
@@ -816,7 +662,6 @@ const Swap: NextPage = () => {
 
         const amountToApprove = parseUnits(fromAmount, fromToken.decimals);
 
-        // 2. If allowance is enough, skip approve
         if (BigInt(allowance as string) >= amountToApprove) {
             return;
         }
@@ -824,7 +669,6 @@ const Swap: NextPage = () => {
         try {
             showPending('Approve token spending');
 
-            // 3. Approve
             const txHash = await writeContractAsync({
                 address: fromToken.address as `0x${string}`,
                 abi: Erc20_ABI,
@@ -852,53 +696,29 @@ const Swap: NextPage = () => {
         }
     };
 
-    const debounceTimeout = 400; // ms
+    const debounceTimeout = 1000; // ms
 
     useEffect(() => {
-        if (isProgrammaticUpdate.current) {
-            isProgrammaticUpdate.current = false;
-            return;
-        }
 
-        // Don't call API for wrap/unwrap
         if (swapType === 0 || swapType === 1) {
-            if (lastChanged === 'from') setToAmount(fromAmount ? fromAmount : '');
-            if (lastChanged === 'to') setFromAmount(toAmount ? toAmount : '');
+            setToAmount(fromAmount ? fromAmount : '');
             return;
         }
 
-        // Debounce logic
         const handler = setTimeout(() => {
-            let fromTokenAddress = fromToken?.address === '0x0000000000000000000000000000000000000000' ? WPLS_ADDRESS : fromToken?.address;
-            let toTokenAddress = toToken?.address === '0x0000000000000000000000000000000000000000' ? WPLS_ADDRESS : toToken?.address;
+            let fromTokenAddress = fromToken?.address === PLS_ADDRESS ? WPLS_ADDRESS : fromToken?.address;
+            let toTokenAddress = toToken?.address === PLS_ADDRESS ? WPLS_ADDRESS : toToken?.address;
 
-            if (lastChanged === 'from' && fromAmount && !isNaN(Number(fromAmount)) && fromToken?.decimals) {
+            if (fromAmount && !isNaN(Number(fromAmount)) && fromToken?.decimals && Number(fromAmount) > 0) {
                 setIsLoading(true);
-                axios.post('http://localhost:3001/api/trading/find-path', {
+                axios.post(`${backendUrl}/api/trading/find-path`, {
                     fromToken: fromTokenAddress,
                     toToken: toTokenAddress,
-                    amount: parseUnits(fromAmount, fromToken?.decimals).toString(),
-                    isAmountIn: true
+                    amount: parseUnits(fromAmount, fromToken?.decimals).toString()
                 }).then(res => {
+                    console.log(res.data);
                     setPath(res.data.path);
-                    isProgrammaticUpdate.current = true;
                     setToAmount(formatUnits(res.data.amount, toToken?.decimals ?? 0));
-                }).catch(err => {
-                    console.log(err);
-                }).finally(() => {
-                    setIsLoading(false);
-                });
-            } else if (lastChanged === 'to' && toAmount && !isNaN(Number(toAmount)) && toToken?.decimals) {
-                setIsLoading(true);
-                axios.post('http://localhost:3001/api/trading/find-path', {
-                    fromToken: fromTokenAddress,
-                    toToken: toTokenAddress,
-                    amount: parseUnits(toAmount, toToken?.decimals).toString(),
-                    isAmountIn: false
-                }).then(res => {
-                    setPath(res.data.path);
-                    isProgrammaticUpdate.current = true;
-                    setFromAmount(formatUnits(res.data.amount, fromToken?.decimals ?? 0));
                 }).catch(err => {
                     console.log(err);
                 }).finally(() => {
@@ -909,9 +729,7 @@ const Swap: NextPage = () => {
 
         return () => clearTimeout(handler);
     }, [
-        lastChanged,
         fromAmount,
-        toAmount,
         fromToken,
         toToken,
         swapType
@@ -1015,10 +833,7 @@ const Swap: NextPage = () => {
                                 <input
                                     type="number"
                                     value={toAmount}
-                                    onChange={e => {
-                                        handleToAmountChange(e.target.value);
-                                    }}
-                                    disabled = {isLoading}
+                                    disabled = {true}
                                     placeholder="0.0"
                                     className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white outline-none appearance-textfield
                                         [&::-webkit-outer-spin-button]:appearance-none
@@ -1076,7 +891,7 @@ const Swap: NextPage = () => {
                                 <span className="text-white text-sm">{slippage}%</span>
                             </div>
                             <div className="flex gap-2">
-                                {[0.1, 0.5, 1.0].map((value) => (
+                                {[1, 5, 10, 20, 50].map((value) => (
                                     <button
                                         key={value}
                                         onClick={() => setSlippage(value)}
