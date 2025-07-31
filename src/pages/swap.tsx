@@ -6,7 +6,7 @@ import { getBalance, readContract, waitForTransactionReceipt } from '@wagmi/core
 import { formatUnits, maxUint256, parseUnits } from 'viem';
 import axios from 'axios';
 import { config } from '../wagmi';
-import { WPLS_ADDRESS, PLS_ADDRESS, WPLS_ABI, PulseX_Router_Address, PulseX_Router_ABI, Erc20_ABI } from '../utils/contractData';
+import { WPLS_ADDRESS, PLS_ADDRESS, WPLS_ABI, Swappie_Router_Address, Swappie_Router_ABI, Erc20_ABI } from '../utils/contractData';
 import { useWriteContract } from 'wagmi'
 import { useTransactionModal } from '../hooks/useTransactionModal';
 import { TransactionModal } from '../components/TransactionModal';
@@ -549,8 +549,8 @@ const Swap: NextPage = () => {
             console.log(amountOutMin);
 
             const hash = await writeContractAsync({
-                address: PulseX_Router_Address,
-                abi: PulseX_Router_ABI,
+                address: Swappie_Router_Address,
+                abi: Swappie_Router_ABI,
                 functionName: 'swapExactETHForTokensSupportingFeeOnTransferTokens',
                 chainId: 369,
                 value: parseUnits(fromAmount, 18),
@@ -586,8 +586,8 @@ const Swap: NextPage = () => {
             const amountOutMin = (amount * slippageFactor) / BigInt(1000);
 
             const hash = await writeContractAsync({
-                address: PulseX_Router_Address,
-                abi: PulseX_Router_ABI,
+                address: Swappie_Router_Address,
+                abi: Swappie_Router_ABI,
                 functionName: 'swapExactTokensForETHSupportingFeeOnTransferTokens',
                 chainId: 369,
                 args: [parseUnits(fromAmount, fromToken?.decimals ?? 0), amountOutMin, path, address, deadline]
@@ -620,10 +620,10 @@ const Swap: NextPage = () => {
             const slippageFactor = BigInt(Math.floor((1 - slippagePercent) * 1000));
             const amount = parseUnits(toAmount, toToken?.decimals ?? 0);
             const amountOutMin = (amount * slippageFactor) / BigInt(1000);
-
+            
             const hash = await writeContractAsync({
-                address: PulseX_Router_Address,
-                abi: PulseX_Router_ABI,
+                address: Swappie_Router_Address,
+                abi: Swappie_Router_ABI,
                 functionName: 'swapExactTokensForTokensSupportingFeeOnTransferTokens',
                 chainId: 369,
                 args: [parseUnits(fromAmount, fromToken?.decimals ?? 0), amountOutMin, path, address, deadline]
@@ -655,7 +655,7 @@ const Swap: NextPage = () => {
             functionName: 'allowance',
             args: [
                 address,                // owner (user's address)
-                PulseX_Router_Address   // spender (router)
+                Swappie_Router_Address   // spender (router)
             ],
             chainId: 369
         });
@@ -674,7 +674,7 @@ const Swap: NextPage = () => {
                 abi: Erc20_ABI,
                 functionName: 'approve',
                 args: [
-                    PulseX_Router_Address,
+                    Swappie_Router_Address,
                     maxUint256
                 ],
                 chainId: 369

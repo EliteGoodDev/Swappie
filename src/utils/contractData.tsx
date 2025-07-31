@@ -23,8 +23,8 @@ export const WPLS_ABI = [
     }
 ]
 
-export const PulseX_Router_Address = "0x165C3410fC91EF562C50559f7d2289fEbed552d9";
-export const PulseX_Router_ABI = [
+export const Swappie_Router_Address = "0x978B5657614C917f8C8745B1587aD9c92cC0c6e4";
+export const Swappie_Router_ABI = [
   {
     "inputs": [
       { "internalType": "uint256", "name": "amountIn", "type": "uint256" },
