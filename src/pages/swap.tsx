@@ -546,7 +546,6 @@ const Swap: NextPage = () => {
             const amount = parseUnits(toAmount, toToken?.decimals ?? 0);
             const amountOutMin = (amount * slippageFactor) / BigInt(1000);
 
-            console.log(amountOutMin);
 
             const hash = await writeContractAsync({
                 address: Swappie_Router_Address,
@@ -716,7 +715,6 @@ const Swap: NextPage = () => {
                     toToken: toTokenAddress,
                     amount: parseUnits(fromAmount, fromToken?.decimals).toString()
                 }).then(res => {
-                    console.log(res.data);
                     setPath(res.data.path);
                     setToAmount(formatUnits(res.data.amount, toToken?.decimals ?? 0));
                 }).catch(err => {
