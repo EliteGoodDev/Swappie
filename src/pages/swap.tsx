@@ -11,6 +11,7 @@ import { useWriteContract } from 'wagmi'
 import { useTransactionModal } from '../hooks/useTransactionModal';
 import { TransactionModal } from '../components/TransactionModal';
 import { backendUrl } from '../utils/config';
+import Image from 'next/image';
 
 interface Token {
     chainId: number;
@@ -351,13 +352,12 @@ const Swap: NextPage = () => {
                     
                     {previewToken && !isPreviewLoading && (
                         <div className="flex items-center gap-3 p-3 bg-slate-700 rounded-lg mb-2 border border-green-500">
-                            <img
+                            <Image
                                 src={previewToken.logoURI}
                                 alt={previewToken.symbol}
+                                width={32}
+                                height={32}
                                 className="w-8 h-8 rounded-full flex-shrink-0"
-                                onError={(e) => {
-                                    e.currentTarget.src = 'https://dummyimage.com/64x64/cccccc/000000&text=?';
-                                }}
                             />
                             <div className="flex-1 min-w-0">
                                 <div className="text-white font-medium truncate">{previewToken.symbol}</div>
@@ -419,13 +419,12 @@ const Swap: NextPage = () => {
                                     }}
                                     className="flex items-center p-3 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-slate-600"
                                 >
-                                    <img
+                                    <Image
                                         src={token.logoURI}
                                         alt={token.symbol}
                                         className="w-8 h-8 rounded-full mr-3 flex-shrink-0"
-                                        onError={(e) => {
-                                            e.currentTarget.src = 'https://dummyimage.com/64x64/cccccc/000000&text=?';
-                                        }}
+                                        width={32}
+                                        height={32}
                                     />
                                     <div className="flex-1 min-w-0">
                                         <div className="text-white font-medium truncate">{token.symbol}</div>
@@ -775,7 +774,12 @@ const Swap: NextPage = () => {
                                         className="flex items-center bg-slate-600 hover:bg-slate-500 rounded-lg px-3 py-2 transition-colors max-w-[200px] overflow-hidden cursor-pointer"
                                         type="button"
                                     >
-                                        <img src={fromToken?.logoURI} alt={fromToken?.symbol} className="w-6 h-6 rounded-full mr-2 flex-shrink-0" />
+                                        <Image 
+                                        src={fromToken?.logoURI ?? ''} 
+                                        alt={fromToken?.symbol ?? ''} 
+                                        width={24}
+                                        height={24}
+                                        className="w-6 h-6 rounded-full mr-2 flex-shrink-0" />
                                         <span className="text-white font-medium truncate">{fromToken?.symbol}</span>
                                         <svg className="w-4 h-4 ml-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -842,7 +846,13 @@ const Swap: NextPage = () => {
                                     className="flex items-center bg-slate-600 hover:bg-slate-500 rounded-lg px-3 py-2 transition-colors max-w-[200px] overflow-hidden cursor-pointer"
                                     type="button"
                                 >
-                                    <img src={toToken?.logoURI} alt={toToken?.symbol} className="w-6 h-6 rounded-full mr-2 flex-shrink-0" />
+                                    <Image 
+                                    src={toToken?.logoURI ?? ''} 
+                                    alt={toToken?.symbol ?? ''} 
+                                    width={24}
+                                    height={24}
+                                    className="w-6 h-6 rounded-full mr-2 flex-shrink-0" 
+                                    />
                                     <span className="text-white font-medium truncate">{toToken?.symbol}</span>
                                     <svg className="w-4 h-4 ml-2 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
