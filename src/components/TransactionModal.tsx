@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { X } from 'lucide-react';
 
 export interface TransactionModalProps {
@@ -22,6 +22,11 @@ export const TransactionModal = ({
 }: TransactionModalProps) => {
   const [isVisible, setIsVisible] = useState(false);
 
+  const handleClose = useCallback(() => {
+    setIsVisible(false);
+    setTimeout(() => onClose(), 200); // Allow animation to complete
+  }, [onClose]);
+
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
@@ -37,12 +42,7 @@ export const TransactionModal = ({
     } else {
       setIsVisible(false);
     }
-  }, [isOpen, status, autoClose, autoCloseDelay]);
-
-  const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(() => onClose(), 200); // Allow animation to complete
-  };
+  }, [isOpen, status, autoClose, autoCloseDelay, handleClose]);
 
   if (!isOpen) return null;
 
