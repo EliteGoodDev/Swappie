@@ -23,7 +23,7 @@ export const WPLS_ABI = [
     }
 ]
 
-export const Swappie_Router_Address = "0x978B5657614C917f8C8745B1587aD9c92cC0c6e4";
+export const Swappie_Router_Address = "0xfC1e0b34B5A23fAc02Be4a26Ec0545F349887C39";
 export const Swappie_Router_ABI = [
   {
     "inputs": [
