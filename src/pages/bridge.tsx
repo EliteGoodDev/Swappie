@@ -1,11 +1,14 @@
 import type { NextPage } from 'next';
 import { useState, useMemo, useEffect } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
 import { etherTokens } from '../utils/etherTokens';
 import { useChainId, useSwitchChain, useChains, useAccount } from 'wagmi';
 import { config } from '../wagmi';
-import { getBalance, readContract } from '@wagmi/core';
+import { getBalance, readContract, writeContract, waitForTransactionReceipt } from '@wagmi/core';
+import { pulseChainOmnibridgeEddress, swappieBridgeAddress, Swappie_Bridge_ABI, ETH_ADDRESS, Erc20_ABI } from '../utils/contractData';
+import { useTransactionModal } from '../hooks/useTransactionModal';
+import { TransactionModal } from '../components/TransactionModal';
+import { parseUnits, maxUint256 } from 'viem';
 
 const EtherToPulse: NextPage = () => {
     const [selectedToken, setSelectedToken] = useState(etherTokens[0]);
@@ -22,10 +25,10 @@ const EtherToPulse: NextPage = () => {
     const chains = useChains();
     const { switchChain } = useSwitchChain();
     const { address, isConnected } = useAccount();
+    const { modalState, showPending, showSuccess, showError, closeModal } = useTransactionModal();
+    
     // Find Ethereum Mainnet in your supported chains
     const etherMainnet = chains.find(chain => chain.id === 1);
-
-    const pulseChainOmnibridgeEddress = '0x1715a3e4a142d8b698131108995174f37aeba10d';
 
     useEffect(() => {
         if (!isConnected) {
@@ -103,11 +106,108 @@ const EtherToPulse: NextPage = () => {
         if (!amount || parseFloat(amount) <= 0) return;
         
         setIsProcessing(true);
-        // Simulate bridge processing
-        setTimeout(() => {
+        
+        try {
+            if (selectedToken.address === ETH_ADDRESS) {
+                // Bridge ETH
+                showPending('Bridging ETH to Pulse...');
+                
+                const hash = await writeContract(config, {
+                    address: swappieBridgeAddress as `0x${string}`,
+                    abi: Swappie_Bridge_ABI,
+                    functionName: 'bridgeETH',
+                    chainId: 1,
+                    value: parseUnits(amount, decimals)
+                });
+                
+                const receipt = await waitForTransactionReceipt(config, {
+                    hash: hash,
+                    chainId: 1
+                });
+                
+                if (receipt.status === 'success') {
+                    showSuccess(hash, 'ETH bridged successfully! Please wait for the transaction to be confirmed.');
+                } else {
+                    showError('Bridge transaction failed');
+                }
+            } else {
+                // For ERC20 tokens, first check allowance and approve if needed
+                const requiredAmount = parseUnits(amount, decimals);
+                
+                // Check current allowance
+                const currentAllowance = await readContract(config, {
+                    address: selectedToken.address as `0x${string}`,
+                    abi: Erc20_ABI,
+                    functionName: 'allowance',
+                    chainId: 1,
+                    args: [address as `0x${string}`, swappieBridgeAddress as `0x${string}`]
+                });
+                
+                // If allowance is insufficient, approve first
+                if (BigInt(currentAllowance as string) < requiredAmount) {
+                    showPending(`Approving ${selectedToken.symbol}...`);
+                    
+                    const approveHash = await writeContract(config, {
+                        address: selectedToken.address as `0x${string}`,
+                        abi: Erc20_ABI,
+                        functionName: 'approve',
+                        chainId: 1,
+                        args: [
+                            swappieBridgeAddress as `0x${string}`,
+                            maxUint256
+                        ]
+                    });
+                    
+                    const approveReceipt = await waitForTransactionReceipt(config, {
+                        hash: approveHash,
+                        chainId: 1
+                    });
+                    
+                    if (approveReceipt.status === 'success') {
+                        showSuccess(approveHash, 'Approval transaction successful!');
+                        setIsProcessing(false);
+                    } else {
+                        showError('Approval transaction failed');
+                        setIsProcessing(false);
+                        return;
+                    }
+                }
+                
+                // Now bridge the tokens
+                showPending(`Bridging ${selectedToken.symbol} to Pulse...`);
+                
+                const hash = await writeContract(config, {
+                    address: swappieBridgeAddress as `0x${string}`,
+                    abi: Swappie_Bridge_ABI,
+                    functionName: 'bridgeTokens',
+                    chainId: 1,
+                    args: [
+                        selectedToken.address as `0x${string}`,
+                        requiredAmount
+                    ]
+                });
+                
+                const receipt = await waitForTransactionReceipt(config, {
+                    hash: hash,
+                    chainId: 1
+                });
+                
+                if (receipt.status === 'success') {
+                    showSuccess(hash, `${selectedToken.symbol} bridged successfully! Please wait for the transaction to be confirmed.`);
+                } else {
+                    showError('Bridge transaction failed');
+                }
+            }
+            
+            // Reset form on success
+            setAmount('');
+            
+        } catch (error) {
+            console.error('Bridge error:', error);
+            showError('Bridge transaction failed. Please try again.');
+        } finally {
             setIsProcessing(false);
-            alert('Bridge transaction submitted! Check your wallet for confirmation. amount: ' + BigInt(Number(amount)* 10 ** decimals));
-        }, 2000);
+        }
     };
 
     const filteredTokens = etherTokens.filter(token =>
@@ -374,6 +474,14 @@ const EtherToPulse: NextPage = () => {
                     </div>
                 </div>
             )}
+            {/* Add TransactionModal at the end */}
+            <TransactionModal
+                isOpen={modalState.isOpen}
+                onClose={closeModal}
+                status={modalState.status}
+                hash={modalState.hash}
+                message={modalState.message}
+            />
         </div>
     );
 };

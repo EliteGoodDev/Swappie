@@ -1,29 +1,36 @@
+// PulseChain
 export const WPLS_ADDRESS = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27";
 export const PLS_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const Swappie_Router_Address = "0xfC1e0b34B5A23fAc02Be4a26Ec0545F349887C39";
+
+//Ethereum
+export const pulseChainOmnibridgeEddress = '0x1715a3e4a142d8b698131108995174f37aeba10d';
+export const swappieBridgeAddress = '0x578833840b309620cbc9864f5e5e3f32b378027e';
+export const ETH_ADDRESS = '0x0000000000000000000000000000000000000000';
+
 export const WPLS_ABI = [
-    {
-        "inputs": [],
-        "name": "deposit",
-        "outputs": [],
-        "stateMutability": "payable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "uint256",
-                "name": "wad",
-                "type": "uint256"
-            }
-        ],
-        "name": "withdraw",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    }
+  {
+      "inputs": [],
+      "name": "deposit",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+  },
+  {
+      "inputs": [
+          {
+              "internalType": "uint256",
+              "name": "wad",
+              "type": "uint256"
+          }
+      ],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+  }
 ]
 
-export const Swappie_Router_Address = "0xfC1e0b34B5A23fAc02Be4a26Ec0545F349887C39";
 export const Swappie_Router_ABI = [
   {
     "inputs": [
@@ -121,5 +128,58 @@ export const Erc20_ABI = [
     ],
     "type": "function",
     "stateMutability": "view"
+  }
+];
+
+export const Swappie_Bridge_ABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_value",
+        "type": "uint256"
+      }
+    ],
+    "name": "bridgeTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "bridgeETH",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_value",
+        "type": "uint256"
+      }
+    ],
+    "name": "TokenBridged",
+    "type": "event"
   }
 ];
