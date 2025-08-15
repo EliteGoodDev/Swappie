@@ -1,5 +1,5 @@
 import type { NextPage } from 'next';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { etherTokens } from '../utils/etherTokens';
 import { useChainId, useSwitchChain, useChains, useAccount } from 'wagmi';
@@ -19,7 +19,7 @@ const EtherToPulse: NextPage = () => {
     const [availableBalance, setAvailableBalance] = useState('');
     const [decimals, setDecimals] = useState(0);
     const [minPerTx, setMinPerTx] = useState(0);
-    const [platformFee, setPlatformFee] = useState(250);
+    const [platformFee, setPlatformFee] = useState(0);
 
     const chainId = useChainId();
     const chains = useChains();
@@ -29,6 +29,22 @@ const EtherToPulse: NextPage = () => {
     
     // Find Ethereum Mainnet in your supported chains
     const etherMainnet = chains.find(chain => chain.id === 1);
+
+    const getPlatformFee = async () => {
+
+        const platformFee = await readContract(config, {
+            address: swappieBridgeAddress as `0x${string}`,
+            abi: Swappie_Bridge_ABI,
+            functionName: 'platformFee',
+            chainId: 1
+        });
+
+        setPlatformFee(Number(platformFee));
+    }
+
+    useEffect(() => {
+        getPlatformFee();
+    }, []);
 
     useEffect(() => {
         if (!isConnected) {
@@ -42,7 +58,7 @@ const EtherToPulse: NextPage = () => {
     }, [chainId, etherMainnet, switchChain, isConnected]);
 
     // Extract fetchBalance function so it can be called from handleBridge
-    const fetchBalance = async () => {
+    const fetchBalance = useCallback(async () => {
         if (address) {
             let tokenAddress = selectedToken.address;
             let decimal = 18;
@@ -98,11 +114,11 @@ const EtherToPulse: NextPage = () => {
             
             setMinPerTx(Math.ceil(Number(minPerTx) / Number(10 ** decimal) * 100 / (100 - 0.25) *10000)/10000);
         }
-    };
+    }, [address, selectedToken]); // Add dependencies
 
     useEffect(() => {
         fetchBalance();
-    }, [selectedToken, address]);
+    }, [fetchBalance]); // Now fetchBalance is properly memoized
 
     const handleBridge = async () => {
         if (!amount || parseFloat(amount) <= 0) return;
@@ -224,14 +240,14 @@ const EtherToPulse: NextPage = () => {
     // Calculate bridge amount and fee
     const bridgeCalculations = useMemo(() => {
         const inputAmount = parseFloat(amount) || 0;
-        const fee = inputAmount * platformFee/1000/100;
+        const fee = inputAmount * platformFee/10000;
         const bridgeAmount = inputAmount - fee;
         
         return {
             inputAmount,
             fee,
             bridgeAmount,
-            feeRate: platformFee/1000
+            feeRate: platformFee/100
         };
     }, [amount, platformFee]);
 
