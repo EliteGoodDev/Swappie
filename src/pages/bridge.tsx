@@ -41,64 +41,66 @@ const EtherToPulse: NextPage = () => {
         }
     }, [chainId, etherMainnet, switchChain, isConnected]);
 
-    useEffect(() => {
-        const fetchBalance = async () => {
-            if (address) {
-                let tokenAddress = selectedToken.address;
-                let decimal = 18;
-                if (selectedToken.symbol == 'ETH') {
-                    const balance = await getBalance(config, {
-                        address: address as `0x${string}`,
-                        chainId: 1
-                        });
-                    setAvailableBalance(balance.formatted);
-                    setDecimals(balance.decimals);
-
-                    tokenAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-                }
-                else{
-                    const balance = await getBalance(config, {
-                        address: address as `0x${string}`,
-                        token: selectedToken.address as `0x${string}`,
-                        chainId: 1
+    // Extract fetchBalance function so it can be called from handleBridge
+    const fetchBalance = async () => {
+        if (address) {
+            let tokenAddress = selectedToken.address;
+            let decimal = 18;
+            if (selectedToken.symbol == 'ETH') {
+                const balance = await getBalance(config, {
+                    address: address as `0x${string}`,
+                    chainId: 1
                     });
-                    setAvailableBalance(balance.formatted);
-                    setDecimals(balance.decimals);
+                setAvailableBalance(balance.formatted);
+                setDecimals(balance.decimals);
 
-                    decimal = balance.decimals;
-                }
-
-                const minPerTx = await readContract(config, {
-                    address: pulseChainOmnibridgeEddress as `0x${string}`,
-                    abi: [
-                        {
-                            inputs: [
-                                {
-                                    internalType: 'address',
-                                    name: '_token',
-                                    type: 'address'
-                                }
-                            ],
-                            name: 'minPerTx',
-                            outputs: [
-                                {
-                                     internalType: 'uint256',
-                                     name: '',
-                                     type: 'uint256'
-                                }
-                            ],
-                            stateMutability: 'view',
-                            type: 'function'
-                        }
-                    ],
-                    functionName: 'minPerTx',
-                    chainId: 1,
-                    args: [tokenAddress as `0x${string}`]
-                });
-                
-                setMinPerTx(Math.ceil(Number(minPerTx) / Number(10 ** decimal) * 100 / (100 - 0.25) *10000)/10000);
+                tokenAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
             }
-        };
+            else{
+                const balance = await getBalance(config, {
+                    address: address as `0x${string}`,
+                    token: selectedToken.address as `0x${string}`,
+                    chainId: 1
+                });
+                setAvailableBalance(balance.formatted);
+                setDecimals(balance.decimals);
+
+                decimal = balance.decimals;
+            }
+
+            const minPerTx = await readContract(config, {
+                address: pulseChainOmnibridgeEddress as `0x${string}`,
+                abi: [
+                    {
+                        inputs: [
+                            {
+                                internalType: 'address',
+                                name: '_token',
+                                type: 'address'
+                            }
+                        ],
+                        name: 'minPerTx',
+                        outputs: [
+                            {
+                                 internalType: 'uint256',
+                                 name: '',
+                                 type: 'uint256'
+                            }
+                        ],
+                        stateMutability: 'view',
+                        type: 'function'
+                    }
+                ],
+                functionName: 'minPerTx',
+                chainId: 1,
+                args: [tokenAddress as `0x${string}`]
+            });
+            
+            setMinPerTx(Math.ceil(Number(minPerTx) / Number(10 ** decimal) * 100 / (100 - 0.25) *10000)/10000);
+        }
+    };
+
+    useEffect(() => {
         fetchBalance();
     }, [selectedToken, address]);
 
@@ -127,6 +129,8 @@ const EtherToPulse: NextPage = () => {
                 
                 if (receipt.status === 'success') {
                     showSuccess(hash, 'ETH bridged successfully! Please wait for the transaction to be confirmed.');
+                    // Refresh balance after successful bridge
+                    await fetchBalance();
                 } else {
                     showError('Bridge transaction failed');
                 }
@@ -194,6 +198,8 @@ const EtherToPulse: NextPage = () => {
                 
                 if (receipt.status === 'success') {
                     showSuccess(hash, `${selectedToken.symbol} bridged successfully! Please wait for the transaction to be confirmed.`);
+                    // Refresh balance after successful bridge
+                    await fetchBalance();
                 } else {
                     showError('Bridge transaction failed');
                 }
