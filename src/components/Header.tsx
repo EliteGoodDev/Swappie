@@ -21,23 +21,19 @@ export const Header = () => {
           <div className="flex items-center space-x-6">
             <nav className="hidden md:flex items-center space-x-8">
             <Link href="/" className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105 relative group">
-                <span className="relative z-10">Dashboard</span>
+                <span className="relative z-10">Home</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </Link> 
               <Link href="/bridge" className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105 relative group">
                 <span className="relative z-10">Bridge</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </Link>
-              <Link href="/swap" className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105 relative group">
-                <span className="relative z-10">Swap</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              </Link>  
             </nav>
             <div className="flex items-center space-x-3">
-              <div className="hidden md:flex items-center space-x-2 px-3 py-2 glass rounded-lg">
+              {/* <div className="hidden md:flex items-center space-x-2 px-3 py-2 glass rounded-lg">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-xs text-gray-300">Live</span>
-              </div>
+              </div> */}
               <ConnectButton />
             </div>
           </div>

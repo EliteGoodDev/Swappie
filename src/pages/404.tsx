@@ -30,12 +30,7 @@ const Custom404: NextPage = () => {
                     >
                         Go Home
                     </Link>
-                    <Link 
-                        href="/swap"
-                        className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105"
-                    >
-                        Swap Tokens
-                    </Link>
+                    
                     <Link 
                         href="/bridge"
                         className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105"

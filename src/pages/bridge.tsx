@@ -167,27 +167,39 @@ const EtherToPulse: NextPage = () => {
                 if (BigInt(currentAllowance as string) < requiredAmount) {
                     showPending(`Approving ${selectedToken.symbol}...`);
                     
-                    const approveHash = await writeContract(config, {
-                        address: selectedToken.address as `0x${string}`,
-                        abi: Erc20_ABI,
-                        functionName: 'approve',
-                        chainId: 1,
-                        args: [
-                            swappieBridgeAddress as `0x${string}`,
-                            maxUint256
-                        ]
-                    });
-                    
-                    const approveReceipt = await waitForTransactionReceipt(config, {
-                        hash: approveHash,
-                        chainId: 1
-                    });
-                    
-                    if (approveReceipt.status === 'success') {
-                        showSuccess(approveHash, 'Approval transaction successful!');
-                        setIsProcessing(false);
-                    } else {
-                        showError('Approval transaction failed');
+                    try {
+                        const approveHash = await writeContract(config, {
+                            address: selectedToken.address as `0x${string}`,
+                            abi: Erc20_ABI,
+                            functionName: 'approve',
+                            chainId: 1,
+                            args: [
+                                swappieBridgeAddress as `0x${string}`,
+                                maxUint256
+                            ]
+                        });
+                        
+                        const approveReceipt = await waitForTransactionReceipt(config, {
+                            hash: approveHash,
+                            chainId: 1
+                        });
+                        
+                        if (approveReceipt.status === 'success') {
+                            showSuccess(approveHash, 'Approval transaction successful!');
+                            setIsProcessing(false);
+                            return; // Exit here after successful approval
+                        } else {
+                            showError('Approval transaction failed');
+                            setIsProcessing(false);
+                            return;
+                        }
+                    } catch (approveError) {
+                        // Check if user rejected the approval
+                        if (approveError instanceof Error && approveError.message.includes('User rejected')) {
+                            showError('Approval was cancelled by user');
+                        } else {
+                            showError('Approval transaction failed. Please try again.');
+                        }
                         setIsProcessing(false);
                         return;
                     }
@@ -226,7 +238,13 @@ const EtherToPulse: NextPage = () => {
             
         } catch (error) {
             console.error('Bridge error:', error);
-            showError('Bridge transaction failed. Please try again.');
+            
+            // Check if user rejected the transaction
+            if (error instanceof Error && error.message.includes('User rejected')) {
+                showError('Transaction was cancelled by user');
+            } else {
+                showError('Bridge transaction failed. Please try again.');
+            }
         } finally {
             setIsProcessing(false);
         }
