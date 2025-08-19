@@ -21,7 +21,7 @@ export const Header = () => {
           <div className="flex items-center space-x-6">
             <nav className="hidden md:flex items-center space-x-8">
             <Link href="/" className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105 relative group">
-                <span className="relative z-10">Home</span>
+                <span className="relative z-10">Swap</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </Link> 
               <Link href="/bridge" className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105 relative group">
