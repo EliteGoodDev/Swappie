@@ -48,7 +48,6 @@ const EtherToPulse: NextPage = () => {
 
     useEffect(() => {
         if (!isConnected) {
-            alert('Please connect your wallet to continue');
             return;
         }
         // If not on Ethereum Mainnet, prompt to switch

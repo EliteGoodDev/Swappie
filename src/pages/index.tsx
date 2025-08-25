@@ -53,7 +53,6 @@ const Swap: NextPage = () => {
 
     useEffect(() => {
         if (!isConnected) {
-            alert('Please connect your wallet to continue');
             return;
         }
         if (chainId !== 369 && pulseChain && switchChain) {
