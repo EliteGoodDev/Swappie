@@ -6,6 +6,7 @@ import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import '../styles/global.css';
 import { config } from '../wagmi';
 import { Header } from '../components/Header';
+import BottomNav from '../components/BottomNav';
 
 const client = new QueryClient();
 
@@ -16,9 +17,10 @@ function MyApp({ Component, pageProps }: AppProps) {
         <RainbowKitProvider>
           <div className="min-h-screen text-white">
             <Header />
-            <main className="pt-4">
+            <main className="pt-4 pb-20 md:pb-4">
               <Component {...pageProps} />
             </main>
+            <BottomNav />
           </div>
         </RainbowKitProvider>
       </QueryClientProvider>

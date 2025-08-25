@@ -750,7 +750,7 @@ const Swap: NextPage = () => {
 
 
     return (
-        <div className="container mx-auto px-4 py-20">
+        <div className="container mx-auto px-4 py-8 md:py-20">
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="text-center mb-8">
