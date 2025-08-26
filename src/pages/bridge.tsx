@@ -111,7 +111,7 @@ const EtherToPulse: NextPage = () => {
                 args: [tokenAddress as `0x${string}`]
             });
             
-            setMinPerTx(Math.ceil(Number(minPerTx) / Number(10 ** decimal) * 100 / (100 - 0.25) *10000)/10000);
+            setMinPerTx(Math.ceil(Number(minPerTx) / Number(10 ** decimal) * 100 / (100 - 0.5) *10000)/10000);
         }
     }, [address, selectedToken]); // Add dependencies
 
