@@ -1,1 +1,1 @@
-export const backendUrl = "http://46.202.178.108:3001";
+export const backendUrl = "https://app.goswappie.com";
