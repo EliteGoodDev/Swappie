@@ -6,7 +6,7 @@ import {
 
 export const config = getDefaultConfig({
   appName: 'PulseSwap',
-  projectId: 'YOUR_PROJECT_ID',
+  projectId: 'c17e7bfc7926d61519e3582bf9521344',
   chains: [
     pulsechain,
     mainnet
