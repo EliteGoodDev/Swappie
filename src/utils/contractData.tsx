@@ -1,11 +1,11 @@
 // PulseChain
 export const WPLS_ADDRESS = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27";
 export const PLS_ADDRESS = "0x0000000000000000000000000000000000000000";
-export const Swappie_Router_Address = "0xB13E2a593dC2E7B413225477Edd94C940152755e";
+export const Swappie_Router_Address = "0xA92Ee854E04AF2f2801eBC4A5936e21e37eD64e8";
 
 //Ethereum
 export const pulseChainOmnibridgeEddress = '0x1715a3e4a142d8b698131108995174f37aeba10d';
-export const swappieBridgeAddress = '0xb13e2a593dc2e7b413225477edd94c940152755e';
+export const swappieBridgeAddress = '0xe4bebbb80532106e8d447863903a8f19e7857a43';
 export const ETH_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 export const WPLS_ABI = [
