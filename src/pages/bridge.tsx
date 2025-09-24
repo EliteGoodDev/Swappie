@@ -185,8 +185,6 @@ const EtherToPulse: NextPage = () => {
                         
                         if (approveReceipt.status === 'success') {
                             showSuccess(approveHash, 'Approval transaction successful!');
-                            setIsProcessing(false);
-                            return; // Exit here after successful approval
                         } else {
                             showError('Approval transaction failed');
                             setIsProcessing(false);
